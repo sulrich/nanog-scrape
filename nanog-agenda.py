@@ -16,15 +16,23 @@ def extract_speaker(speaker_cell):
     speakers = []
     speaker_list = speaker_cell.find_all("li")
     for s in speaker_list:
-        (speaker, affiliation) = re.split(",", s.text)
-        # note nested list
-        speakers.append([speaker.strip(), affiliation.strip()])
+        try:
+            (speaker, affiliation) = re.split(",", s.text)
+            # note nested list
+            speakers.append([speaker.strip(), affiliation.strip()])
+        except ValueError:
+            speaker = "malformed spkr:" + s.text.strip()
+            speakers.append([speaker, ""])
 
     return speakers
 
 
 def extract_title(abstract_cell):
-    """meat"""
+    """
+    returns the extracted title from the legacy agendas
+    TODO(sulrich): this needs to handle the cases where there's no H3 to grab
+    but there's something in here that's representative of the title.
+    """
     title = abstract_cell.find("h3", attrs={"class": "txttoggle_action"})
     if title:
         return title.text
