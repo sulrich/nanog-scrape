@@ -4,7 +4,21 @@ from bs4 import BeautifulSoup
 import argparse
 
 
-def getTable(agenda_file):
+def scrub_speaker(speaker):
+    """
+    <td><em><strong>Speakers:</strong></em><br/>
+    <ul class="agenda_speakers"><h3 class="txttoggle_action"><li>%%SPEAKER%% ,
+    %%AFFILIATION%%</li></h3><div class="text_toggle">%%SPEAKER_BIO%%</div>
+    <h3 class="txttoggle_action"></ul></td> }}
+    """
+    pass
+
+
+def scrub_abstract(abstract):
+    pass
+
+
+def get_agenda_table(agenda_file):
     with open(agenda_file) as a_file:
         soup = BeautifulSoup(a_file, "html.parser")
 
@@ -16,11 +30,13 @@ def getTable(agenda_file):
         heading.append(th.text.strip())
 
     print(heading)
+    # ['Time/Webcast:', 'Room:', 'Topic/Abstract:', 'Presenter/Sponsor:', 'Presentation Files:']
 
     for tr in agenda_table.tbody.find_all("tr"):
+        td = tr.find_all("td")
         print("-" * 70)
-        for td in tr.find_all("td"):
-            print("- {{", td.text.strip(), "}}")
+        print("speaker(s): {{", td[3].text.strip(), "}}")
+        print("topic/abstract: {{", td[2].text.strip(), "}}")
 
 
 def main():
@@ -28,7 +44,7 @@ def main():
     parser.add_argument("agenda", help="html agenda file")
     args = parser.parse_args()
 
-    getTable(args.agenda)
+    get_agenda_table(args.agenda)
 
 
 if __name__ == "__main__":
