@@ -3,14 +3,17 @@
 from bs4 import BeautifulSoup
 import argparse
 import re
+import csv
+import pprint
 
 
 def extract_speaker(speaker_cell):
     """
+    sample speaker cell
     <td><em><strong>Speakers:</strong></em><br/>
     <ul class="agenda_speakers"><h3 class="txttoggle_action"><li>%%SPEAKER%% ,
     %%AFFILIATION%%</li></h3><div class="text_toggle">%%SPEAKER_BIO%%</div>
-    <h3 class="txttoggle_action"></ul></td> }}
+    <h3 class="txttoggle_action"></ul></td>
     """
 
     speakers = []
@@ -33,13 +36,25 @@ def extract_title(abstract_cell):
     TODO(sulrich): this needs to handle the cases where there's no H3 to grab
     but there's something in here that's representative of the title.
     """
-    title = abstract_cell.find("h3", attrs={"class": "txttoggle_action"})
-    if title:
-        return title.text
+    title = ""
+    toggled_title = abstract_cell.find("h3", attrs={"class": "txttoggle_action"})
+    if toggled_title:
+        title = toggled_title.text.strip()
+    else:
+        title = abstract_cell.text.strip()
+
+    whitespace_re = re.compile(r"[\n\r\t]")
+    title = whitespace_re.sub(" ", title)
+
+    escape_slash_re = re.compile(r"\\")  # these seem to have escaped
+    title = escape_slash_re.sub("", title)
+
+    return title
 
 
 def extract_presentation(preso):
     """
+    sample presentation cell
     <td><img alt="youtube" height="12" src="/images/doc_icons/youtube_icon.gif"/><a
     href="https://youtu.be/jW-C82JMEQg">Increas ing IP Network Survivability: An
     Introduction to Protection Mechanisms</a><br/><img alt="ppt" height="12"
@@ -55,7 +70,7 @@ def extract_presentation(preso):
         url = l.get("href")
         # these seem to have some form of shortened url, but this substring
         # matches
-        if re.search("youtu", url):
+        if re.search("youtu|\.ram", url):
             video_urls.append(url)
         if re.search("\.(ppt|pdf)", url):
             preso_urls.append(url)
@@ -63,28 +78,94 @@ def extract_presentation(preso):
     return (video_urls, preso_urls)
 
 
+def gen_talk_rows(talk):
+    """gen_talk_rows emits a list of strings that describe a talk. for panel
+    discussions where there are multiple speakers, these are unrolled into a
+    separate entries
+
+    parameters:
+        talk (dict):
+
+    returns:
+        array of strings containing the details associated with the talk
+    """
+    # ROW FORMAT
+    # ----------------------
+    # NANOG number
+    # speaker name
+    # speaker affiliation
+    # title
+    # video_urls
+    # preso_urls
+
+    talk_info = []
+    if len(talk["video"]) > 0:
+        video = talk["video"][0]
+    else:
+        video = ""
+
+    if len(talk["presentation"]) > 1:
+        presos = "|".join(talk["presentation"])
+    elif len(talk["presentation"]) == 1:
+        presos = talk["presentation"][0]
+    else:
+        presos = ""
+
+    if len(talk["speakers"]) > 1:
+        for s in talk["speakers"]:
+            row = [
+                NANOG_NUM,
+                s[0],
+                s[1],
+                talk["title"],
+                video,
+                presos,
+            ]
+            talk_info.append(row)
+    elif len(talk["speakers"]) == 1:
+        row = [
+            NANOG_NUM,
+            talk["speakers"][0][0],
+            talk["speakers"][0][1],
+            talk["title"],
+            video,
+            presos,
+        ]
+        talk_info.append(row)
+    else:
+        talk_info = None  # it's a lunch / break / etc.
+
+    return talk_info
+
+
 def process_agenda_table(agenda_table):
     heading = []
     for th in agenda_table.thead.find_all("th"):
         heading.append(th.text.strip())
 
-    print(heading)
+    # heading
     # ['Time/Webcast:', 'Room:', 'Topic/Abstract:', 'Presenter/Sponsor:', 'Presentation Files:']
 
+    nanog_talks = []
     for tr in agenda_table.tbody.find_all("tr"):
         td = tr.find_all("td")
         if len(td) < 2:
             continue
 
-        speakers = extract_speaker(td[3])
-        title = extract_title(td[2])
         (videos, presos) = extract_presentation(td[4])
-        print("-" * 70)
-        print("timeslot:", td[0].text)
-        print("speakers:", speakers)
-        print("topic/abstract:", title)
-        print("presentation:", presos)
-        print("video:", videos)
+        talk = {
+            "speakers": extract_speaker(td[3]),
+            "title": extract_title(td[2]),
+            "timeslot": td[0].text,
+            "presentation": presos,
+            "video": videos,
+        }
+        talk_row = gen_talk_rows(talk)
+        if talk_row is not None:
+            for r in talk_row:
+                nanog_talks.append(r)
+
+    return nanog_talks
 
 
 def get_agenda_tables(agenda_file):
@@ -95,16 +176,45 @@ def get_agenda_tables(agenda_file):
         "table", attrs={"class": "table_agenda sticky-enabled"}
     )
 
+    export_talks = []
     for agenda in agenda_tables:
-        process_agenda_table(agenda)
+        talks = process_agenda_table(agenda)
+        export_talks.extend(talks)
+
+    return export_talks
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("agenda", help="html agenda file")
+    parser.add_argument(
+        "--nanog",
+        help="nanog number",
+        dest="NANOG_NUM",
+        action="store",
+        required=True,
+    )
+    parser.add_argument(
+        "--csv",
+        help="csv file to output to",
+        dest="csv_file",
+        action="store",
+        required=False,
+    )
     args = parser.parse_args()
 
-    get_agenda_tables(args.agenda)
+    global NANOG_NUM
+    NANOG_NUM = args.NANOG_NUM
+
+    agenda = get_agenda_tables(args.agenda)
+
+    if args.csv_file:
+        with open(args.csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(agenda)
+
+    else:
+        pprint.pprint(agenda, width=100)
 
 
 if __name__ == "__main__":
