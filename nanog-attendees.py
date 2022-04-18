@@ -15,9 +15,10 @@ def process_attendee_table(attendee_table):
             continue
 
         attendee = [
-            td[0].text,
-            td[1].text,
-            td[2].text,
+            NANOG_NUM,
+            td[0].text,  # last name
+            td[1].text,  # first name
+            td[2].text,  # organization
         ]
         attendees.append(attendee)
 
