@@ -19,28 +19,40 @@ export-agendas() {
   local AGENDA_END=70
   for (( i = AGENDA_START; i <= AGENDA_END; i++ ))
   do
-    echo "exporting NANOG $i - agenda"
+    echo "scraping agenda: NANOG $i"
     nanog-agenda.py --nanog "$i" --url archive.nanog.org \
       --csv "csv/nanog-$i-agenda.csv" "agendas/nanog$i-agenda.html"
   done
 
-  echo "consolidating nanog agendas"
-  cat csv/*-agenda.csv > agendas-13-70.csv
+  echo "consolidating NANOG agendas"
+  cat csv/*-agenda.csv > agendas-$AGENDA_START-$AGENDA_END.csv
+  echo "removing scratch CSVs"
+  rm -f csv/*-agenda.csv
 }
 
 ## export-attendees: output the attendee lists
 export-attendees() {
   local ATT_START=12
-  local ATT_END=60
-  for (( i = ATT_START; i <= ATT_END; i++ ))
+  local ATT_END=63
+  local ATT_HTML_END=60
+  for (( i = ATT_START; i <= ATT_HTML_END; i++ ))
   do
-    echo "exporting NANOG $i - attendees"
+    echo "scraping attendees: NANOG $i"
     nanog-attendees.py --nanog "$i" \
       --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.html"
   done
 
-  echo "consolidating nanog attendees"
+  for i in 61 62 63
+  do 
+    echo "scraping attendees: NANOG $i (pdf)" 
+    nanog-attendees.py --nanog "$i" \
+      --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.pdf"
+  done
+
+  echo "consolidating NANOG attendees"
   cat csv/*-attendees.csv > "attendees-$ATT_START-$ATT_END.csv"
+  echo "removing scratch CSVs"
+  rm -f csv/*-attendees.csv
 }
 
 # anything that has ## at the front of the line will be used as input.
@@ -58,6 +70,7 @@ cleanup() {
 
 if [[ $# -lt 1 ]]; then
   help
+  cleanup
   exit
 fi
 

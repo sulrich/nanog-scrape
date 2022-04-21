@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import argparse
 import re
 import csv
+import tabula
 import pprint
 
 
@@ -20,8 +21,8 @@ def process_attendee_table(attendee_table, parse_names):
                 (lname, fname) = re.split(",", td[0].text.strip())
                 attendee = [
                     NANOG_NUM,
-                    lname,
-                    fname,
+                    lname.strip(),
+                    fname.strip(),
                     td[1].text.strip(),
                 ]
                 attendees.append(attendee)
@@ -88,6 +89,41 @@ def get_attendees_table(attendees_file):
     return attendees
 
 
+def pdf_text_clean(cell_text):
+    text = cell_text.strip()
+
+    text = re.sub("\s+", " ", text)
+    return text
+
+
+def fix_pdf_names(name):
+    try:
+        (lname, fname) = re.split(",", name.strip())
+    except ValueError:
+        fname = "malformed attendee:"
+        lname = name.strip()
+
+    lname = lname.strip()
+    fname = fname.strip()
+    return (fname, lname)
+
+
+def parse_attendees_pdf(attendee_pdf):
+    attendee_table = tabula.read_pdf(attendee_pdf, output_format="json", pages="all")
+    # we might need to adjust this for each pdf table
+    attendees = []
+    for data_table in attendee_table:
+        # data_table = attendee_table[1]["data"]
+        for row in data_table["data"]:
+            (fname, lname) = fix_pdf_names(pdf_text_clean(row[0]["text"]))
+            org = pdf_text_clean(row[1]["text"])
+
+            attendee = [NANOG_NUM, lname, fname, org]
+            attendees.append(attendee)
+
+    return attendees
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("attendees", help="html attendees file")
@@ -101,7 +137,7 @@ def main():
     )
     parser.add_argument(
         "--csv",
-        help="csv file to output to",
+        help="csv file for output",
         dest="csv_file",
         action="store",
         required=False,
@@ -111,7 +147,10 @@ def main():
     global NANOG_NUM
     NANOG_NUM = args.NANOG_NUM
 
-    attendees = get_attendees_table(args.attendees)
+    if "pdf" in args.attendees:
+        attendees = parse_attendees_pdf(args.attendees)
+    else:
+        attendees = get_attendees_table(args.attendees)
 
     if args.csv_file:
         with open(args.csv_file, "w", newline="") as f:
