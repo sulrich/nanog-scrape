@@ -25,13 +25,13 @@ export-agendas() {
   done
 
   echo "consolidating nanog agendas"
-  cat csv/*-agenda.csv > nanog-agendas-13-70.csv
+  cat csv/*-agenda.csv > agendas-13-70.csv
 }
 
 ## export-attendees: output the attendee lists
 export-attendees() {
-  local ATT_START=19
-  local ATT_END=52
+  local ATT_START=12
+  local ATT_END=60
   for (( i = ATT_START; i <= ATT_END; i++ ))
   do
     echo "exporting NANOG $i - attendees"
@@ -40,7 +40,7 @@ export-attendees() {
   done
 
   echo "consolidating nanog attendees"
-  cat csv/*-attendees.csv > "nanog-attendees-$ATT_START-$ATT_END.csv"
+  cat csv/*-attendees.csv > "attendees-$ATT_START-$ATT_END.csv"
 }
 
 # anything that has ## at the front of the line will be used as input.

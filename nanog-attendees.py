@@ -7,37 +7,83 @@ import csv
 import pprint
 
 
-def process_attendee_table(attendee_table):
+def process_attendee_table(attendee_table, parse_names):
     attendees = []
-    for tr in attendee_table.tbody.find_all("tr"):
+    for tr in attendee_table.find_all("tr"):
+        # for tr in attendee_table.tbody.find_all("tr"):
         td = tr.find_all("td")
         if len(td) < 2:
             continue
 
-        attendee = [
-            NANOG_NUM,
-            td[0].text,  # last name
-            td[1].text,  # first name
-            td[2].text,  # organization
-        ]
-        attendees.append(attendee)
+        if parse_names:
+            try:
+                (lname, fname) = re.split(",", td[0].text.strip())
+                attendee = [
+                    NANOG_NUM,
+                    lname,
+                    fname,
+                    td[1].text.strip(),
+                ]
+                attendees.append(attendee)
+            except ValueError:
+                attendee = [
+                    NANOG_NUM,
+                    "malformed attendee:" + td[0].text.strip(),
+                    "",
+                    td[1].text.strip(),
+                ]
+                attendees.append(attendee)
+
+        else:
+            try:
+                attendee = [
+                    NANOG_NUM,
+                    td[0].text.strip(),  # last name
+                    td[1].text.strip(),  # first name
+                    td[2].text.strip(),  # organization
+                ]
+                attendees.append(attendee)
+            except IndexError:
+                attendee = [NANOG_NUM]
+                cells = [x.text.strip() for x in td]
+                attendee.extend(cells)
+                attendees.append(attendee)
 
     return attendees
 
 
 def get_attendees_table(attendees_file):
     """
-    there should really only be 1 attendee table in the page.  it appears to be
-    the only one with a border=1.  we'll see ...
+    there should really only be 1 attendee table in the page.
+    different iterations of the NANOG site over the years have moved this.
     """
     with open(attendees_file) as a_file:
         soup = BeautifulSoup(a_file, "html.parser")
 
-    attendees_table = soup.find_all("table", {"border": "1"})
+    if NANOG_NUM in [12]:
+        attendees_table = soup.find_all("table", {"cellpadding": "3"})
+        parse_names = True
+    elif NANOG_NUM in [13]:
+        attendees_table = soup.find_all(
+            "table", {"class": "MsoNormalTable", "border": "0"}
+        )
+        parse_names = True
+    elif NANOG_NUM in [14, 15, 16, 17, 18]:
+        attendees_table = soup.find_all("table", {"border": "1"})
+        parse_names = True
+    elif NANOG_NUM in range(46, 53):
+        attendees_table = soup.find_all("table", {"border": "0", "cellpadding": "4"})
+        parse_names = False
+    elif NANOG_NUM in range(53, 61):
+        attendees_table = soup.find_all("table", {"class": "GJ"})
+        parse_names = True
+    else:
+        attendees_table = soup.find_all("table", {"border": "1"})
+        parse_names = False
 
     attendees = []
     for table in attendees_table:
-        attendees = process_attendee_table(table)
+        attendees = process_attendee_table(table, parse_names)
 
     return attendees
 
@@ -49,6 +95,7 @@ def main():
         "--nanog",
         help="nanog number",
         dest="NANOG_NUM",
+        type=int,
         action="store",
         required=True,
     )
