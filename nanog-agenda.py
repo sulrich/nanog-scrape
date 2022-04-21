@@ -60,7 +60,13 @@ def extract_presentation(preso):
     Introduction to Protection Mechanisms</a><br/><img alt="ppt" height="12"
     src="/images/doc_icons/ppt_icon.gi f"/><a
     href="/meetings/nanog20/presentations/sadler.ppt">Jonathan Sadler
-    Presentation(PPT)</a><br/></td>"""
+    Presentation(PPT)</a><br/></td>
+
+    pull the video links from the cell as well as the URL for the presentation.
+    if the presentation url does not start with "http" create the URL from the
+    URL_BASE.
+
+    """
 
     video_urls = []
     preso_urls = []
@@ -73,7 +79,10 @@ def extract_presentation(preso):
         if re.search("youtu|\.ram", url):
             video_urls.append(url)
         if re.search("\.(ppt|pdf)", url):
-            preso_urls.append(url)
+            if re.search("^http", url):
+                preso_urls.append(url)
+            else:
+                preso_urls.append("https://" + URL_BASE + url)
 
     return (video_urls, preso_urls)
 
@@ -195,6 +204,13 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--url",
+        help="URL base location",
+        dest="url_base",
+        action="store",
+        required=True,
+    )
+    parser.add_argument(
         "--csv",
         help="csv file to output to",
         dest="csv_file",
@@ -205,6 +221,9 @@ def main():
 
     global NANOG_NUM
     NANOG_NUM = args.NANOG_NUM
+
+    global URL_BASE
+    URL_BASE = args.url_base
 
     agenda = get_agenda_tables(args.agenda)
 
