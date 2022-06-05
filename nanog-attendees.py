@@ -17,8 +17,20 @@ def process_attendee_table(attendee_table, parse_names):
             continue
 
         if parse_names:
+            lname = ""
+            fname = ""
             try:
-                (lname, fname) = re.split(",", td[0].text.strip())
+                name = re.split(",", td[0].text.strip())
+                if len(name) == 2:
+                    lname = name[0]
+                    fname = name[1]
+                elif len(name) > 2:
+                    lname = name[0] + name[1]
+                    fname = " ".join(name[2:])
+
+                if lname.strip() == "" and fname.strip() == "":
+                    continue
+
                 attendee = [
                     NANOG_NUM,
                     lname.strip(),
