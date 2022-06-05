@@ -19,13 +19,22 @@ def extract_speaker(speaker_cell):
     speakers = []
     speaker_list = speaker_cell.find_all("li")
     for s in speaker_list:
-        try:
-            (speaker, affiliation) = re.split(",", s.text)
-            # note nested list
-            speakers.append([speaker.strip(), affiliation.strip()])
-        except ValueError:
-            speaker = "malformed spkr:" + s.text.strip()
-            speakers.append([speaker, ""])
+        # remove trailing punctuation
+
+        strip_elements = ". "
+
+        if "," not in s.text:
+            speakers.append([s.text.strip(strip_elements), ""])
+        else:
+            try:
+                (speaker, affiliation) = re.split(",", s.text, maxsplit=1)
+                # note nested list
+                speakers.append(
+                    [speaker.strip(strip_elements), affiliation.strip(strip_elements)]
+                )
+            except ValueError:
+                speaker = "malformed spkr:" + s.text.strip(strip_elements)
+                speakers.append([speaker, ""])
 
     return speakers
 
@@ -119,6 +128,22 @@ def gen_talk_rows(talk):
         presos = talk["presentation"][0]
     else:
         presos = ""
+
+    # filter out the breaks, etc. that are in the agendas. the check for the
+    # non-empty status of the video and the preso fields are to ensure that we
+    # do something reasonable here and aren't suppressing hackathon readouts,
+    # etc.
+    # TODO(sulrich): how do we best handle "women in tech lunches"?
+    if (
+        re.search(
+            "(break|breakfast|beer|social event|lunch|hackathon)",
+            talk["title"],
+            re.IGNORECASE,
+        )
+        and (video == "" and presos == "")
+    ):
+        talk_info = None
+        return
 
     if len(talk["speakers"]) > 1:
         for s in talk["speakers"]:
