@@ -7,6 +7,8 @@ import csv
 import traceback
 import logging
 
+from urllib.parse import urlparse, parse_qs
+
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api import _errors
 from youtube_transcript_api.formatters import TextFormatter
@@ -22,8 +24,19 @@ def getYoutubeTranscript(outdir, nanog_num, url):
     """
 
     # create the filename
-    url_elems = url.split("/")
-    video_id = url_elems[-1]
+    if "?" in url:
+        u = urlparse(url)
+        if "watch" in u.path:
+            qs = parse_qs(u.query)  # returns a dict of lists
+            video_id = qs["v"][0]
+        # sometimes URLs are of the form: https://youtu.be/NZbrpdyJlfg?list=PLO8
+        # when this is the case use the path as the video_id
+        else:
+            video_id = u.path.replace("/", "")
+
+    else:
+        url_elems = url.split("/")
+        video_id = url_elems[-1]
 
     transcript_file = "nanog-" + str(nanog_num) + "-" + video_id + ".txt"
     transcript_path = os.path.join(outdir, transcript_file)
@@ -31,7 +44,15 @@ def getYoutubeTranscript(outdir, nanog_num, url):
     error_path = os.path.join(outdir, error_file)
 
     # check to see if the transcript has been downloaded
-    if not (os.path.exists(transcript_path) or os.path.exists(error_path)):
+    if os.path.exists(transcript_path):
+        error = f"transcript previously captured: {video_id} {transcript_path} - {url}"
+        return error
+    if os.path.exists(error_path):
+        error = (
+            f"error transcript previously unavailable: {video_id} {error_path} - {url}"
+        )
+        return error
+    else:
         try:
             transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
@@ -49,10 +70,8 @@ def getYoutubeTranscript(outdir, nanog_num, url):
             with open(error_path, "w", encoding="utf-8") as error_log:
                 traceback.print_exc(file=error_log)
 
-            error = f"unable to capture transcript: {video_id} exception: {error_path}"
+            error = f"unable to capture transcript: {video_id} exception: {error_path} - {url}"
             return error
-    else:
-        return None
 
 
 def main():
@@ -81,10 +100,7 @@ def main():
             transcript = ""
             if row[4] != "":
                 transcript = getYoutubeTranscript(args.output_dir, row[0], row[4])
-                if transcript:
-                    logging.info(transcript)
-                else:
-                    logging.info("transcript for talk exists: " + row[4])
+                logging.info(transcript)
 
 
 if __name__ == "__main__":
