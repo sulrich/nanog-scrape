@@ -85,7 +85,7 @@ def extract_presentation(preso):
         url = l.get("href")
         # these seem to have some form of shortened url, but this substring
         # matches
-        if re.search("youtu|\.ram", url):
+        if re.search("https://.*youtu|\.ram", url):
             video_urls.append(url)
         if re.search("\.(ppt|pdf)", url):
             if re.search("^http", url):
