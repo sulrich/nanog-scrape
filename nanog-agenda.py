@@ -6,6 +6,10 @@ import re
 import csv
 import pprint
 
+NANOG_NUM = 0
+URL_BASE = ""
+ORIGIN = "archive.nanog.org"
+
 
 def extract_speaker(speaker_cell):
     """
@@ -81,8 +85,8 @@ def extract_presentation(preso):
     preso_urls = []
 
     links = preso.find_all("a")
-    for l in links:
-        url = l.get("href")
+    for link in links:
+        url = link.get("href")
         # these seem to have some form of shortened url, but this substring
         # matches
         if re.search("https://.*youtu|\.ram", url):
@@ -134,14 +138,11 @@ def gen_talk_rows(talk):
     # do something reasonable here and aren't suppressing hackathon readouts,
     # etc.
     # TODO(sulrich): how do we best handle "women in tech lunches"?
-    if (
-        re.search(
-            "(break|breakfast|beer|social event|lunch|hackathon)",
-            talk["title"],
-            re.IGNORECASE,
-        )
-        and (video == "" and presos == "")
-    ):
+    if re.search(
+        "(break|breakfast|beer|social event|lunch|hackathon)",
+        talk["title"],
+        re.IGNORECASE,
+    ) and (video == "" and presos == ""):
         talk_info = None
         return
 
@@ -154,6 +155,7 @@ def gen_talk_rows(talk):
                 talk["title"],
                 video,
                 presos,
+                talk["origin"],
             ]
             talk_info.append(row)
     elif len(talk["speakers"]) == 1:
@@ -164,6 +166,7 @@ def gen_talk_rows(talk):
             talk["title"],
             video,
             presos,
+            talk["origin"],
         ]
         talk_info.append(row)
     else:
@@ -180,6 +183,9 @@ def process_agenda_table(agenda_table):
     # heading
     # ['Time/Webcast:', 'Room:', 'Topic/Abstract:', 'Presenter/Sponsor:', 'Presentation Files:']
 
+    # importing this here for consistency
+    global ORIGIN
+
     nanog_talks = []
     for tr in agenda_table.tbody.find_all("tr"):
         td = tr.find_all("td")
@@ -193,6 +199,7 @@ def process_agenda_table(agenda_table):
             "timeslot": td[0].text,
             "presentation": presos,
             "video": videos,
+            "origin": ORIGIN,
         }
         talk_row = gen_talk_rows(talk)
         if talk_row is not None:
@@ -235,6 +242,14 @@ def main():
         action="store",
         required=True,
     )
+
+    parser.add_argument(
+        "--origin",
+        help="source of the agenda",
+        dest="origin",
+        action="store",
+        required=False,
+    )
     parser.add_argument(
         "--csv",
         help="csv file to output to",
@@ -243,6 +258,10 @@ def main():
         required=False,
     )
     args = parser.parse_args()
+
+    global ORIGIN
+    if args.origin:
+        ORIGIN = args.origin
 
     global NANOG_NUM
     NANOG_NUM = args.NANOG_NUM
