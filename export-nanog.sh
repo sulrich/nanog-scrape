@@ -15,6 +15,7 @@ EOF
 # for the agendas in the range noted export the associated CSVs
 ## export-agendas: output the agenda formats we know of
 export-agendas() {
+  local AGENDA_HEADER="NANOG,SPEAKER,AFFILIATION,TITLE,YOUTUBE,PRESO_FILES,ORIGIN"
   local AGENDA_START=13
   local AGENDA_END=70
   for (( i = AGENDA_START; i <= AGENDA_END; i++ ))
@@ -25,8 +26,9 @@ export-agendas() {
   done
 
   echo "consolidating NANOG agendas"
-  cat csv/*-agenda.csv > agendas-$AGENDA_START-$AGENDA_END.csv
-  echo "removing scratch CSVs"
+  echo "${AGENDA_HEADER}" >  agendas-$AGENDA_START-$AGENDA_END.csv
+  cat csv/*-agenda.csv >> agendas-$AGENDA_START-$AGENDA_END.csv
+  echo "removing scratch agenda CSVs"
   rm -f csv/*-agenda.csv
 }
 
@@ -43,15 +45,15 @@ export-attendees() {
   done
 
   for i in 61 62 63
-  do 
-    echo "scraping attendees: NANOG $i (pdf)" 
+  do
+    echo "scraping attendees: NANOG $i (pdf)"
     nanog-attendees.py --nanog "$i" \
       --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.pdf"
   done
 
   echo "consolidating NANOG attendees"
   cat csv/*-attendees.csv > "attendees-$ATT_START-$ATT_END.csv"
-  echo "removing scratch CSVs"
+  echo "removing scratch attendee CSVs"
   rm -f csv/*-attendees.csv
 }
 
