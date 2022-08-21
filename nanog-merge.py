@@ -2,7 +2,7 @@
 
 import argparse
 import csv
-import pprint
+from fuzzywuzzy import process
 import operator
 
 
@@ -54,7 +54,7 @@ def load_csv(csv_in: str) -> list:
     with open(csv_in, "r", newline="") as csvfile:
         csv_reader = csv.DictReader(csvfile)
         for row in csv_reader:
-            row["NANOG"] = int(row["NANOG"])
+            row["NANOG"] = int(row["NANOG"])  # make this a real int
             csv_list.append(row)
 
     return csv_list
@@ -75,59 +75,9 @@ def create_merged_entry(search_entry, target_entry):
     - TITLE
     """
 
-    # merged_entry = {
-    #     "NANOG": search_entry["NANOG"],
-    #     "SPEAKER": search_entry["SPEAKER"],
-    #     "TITLE": search_entry["TITLE"],
-    #     "AFFILIATION": search_entry["AFFILIATION"],
-    # }
-
     merged_entry = BLANK_ENTRY
     merged_entry.update(target_entry)
     merged_entry.update(search_entry)
-
-    #     merged_entry["YOUTUBE"] = search_entry["YOUTUBE"]
-    # elif target_entry["YOUTUBE"] != "":
-    #     merged_entry["YOUTUBE"] = target_entry["YOUTUBE"]
-    # else:
-    #     merged_entry["YOUTUBE"] = ""
-
-    # if search_entry["PRESO_FILES"] != "":
-    #     merged_entry["PRESO_FILES"] = search_entry["PRESO_FILES"]
-    # else:
-    #     merged_entry["PRESO_FILES"] = ""
-
-    # if search_entry["ORIGIN"] != "":
-    #     merged_entry["ORIGIN"] = search_entry["ORIGIN"]
-    # elif target_entry["ORIGIN"] != "":
-    #     merged_entry["ORIGIN"] = target_entry["ORIGIN"]
-    # else:
-    #     merged_entry["ORIGIN"] = ""
-
-    # if target_entry["LOCATION"] != "":
-    #     merged_entry["LOCATION"] = target_entry["LOCATION"]
-    # else:
-    #     merged_entry["LOCATION"] = ""
-
-    # if target_entry["DATE"] != "":
-    #     merged_entry["DATE"] = target_entry["DATE"]
-    # else:
-    #     merged_entry["DATE"] = ""
-
-    # if target_entry["DURATION_MIN"] != "":
-    #     merged_entry["DURATION_MIN"] = target_entry["DURATION_MIN"]
-    # else:
-    #     merged_entry["DURATION_MIN"] = ""
-
-    # if target_entry["TAGS"] != "":
-    #     merged_entry["TAGS"] = target_entry["TAGS"]
-    # else:
-    #     merged_entry["TAGS"] = ""
-
-    # if target_entry["KEYWORDS"] != "":
-    #     merged_entry["KEYWORDS"] = target_entry["KEYWORDS"]
-    # else:
-    #     merged_entry["KEYWORDS"] = ""
 
     return merged_entry
 
@@ -140,14 +90,22 @@ def search_entry(entry: dict, target_sd: list):
     :returns: dict with the merged speaker entry
 
     """
+
+    nanog = list(
+        filter(
+            lambda nanog_f: (nanog_f["NANOG"] == entry["NANOG"]),
+            target_sd,
+        )
+    )
+
+    # this is really expensive, but will yield a merge
     speaker_entry = list(
         filter(
             lambda target_entry: (
-                target_entry["NANOG"] == entry["NANOG"]
-                and target_entry["SPEAKER"] == entry["SPEAKER"]
-                and target_entry["TITLE"] == entry["TITLE"]
+                process.extractOne(entry["SPEAKER"], target_entry["SPEAKER"])
+                and process.extractOne(entry["TITLE"], target_entry["TITLE"])
             ),
-            target_sd,
+            nanog,
         )
     )
 
@@ -228,11 +186,12 @@ def main():
     ssd_only = ssd_nanogs.difference(rsd_nanogs)
     intersecting_sd = rsd_nanogs.intersection(ssd_nanogs)
 
-    # filter the datasets to relevant NANOGs only and generate merged entries
+    # filter the datasets to relevant NANOGs
     rsd_nanog_speakers = filter_nanogs(rsd_only, rsd)
     ssd_nanog_speakers = filter_nanogs(ssd_only, ssd)
     shared_nanog_speakers = filter_nanogs(intersecting_sd, ssd)
 
+    # generate merged entries
     merged_speakers = []
 
     # first pass - add the NANOGs that are rsd_only into the mix
@@ -254,6 +213,7 @@ def main():
         if merged_entry:
             merged_speakers.append(merged_entry)
 
+    # sort based on NANOG, then speaker for export
     merged_speakers.sort(key=operator.itemgetter("NANOG", "SPEAKER"))
 
     if args.csv_out:
