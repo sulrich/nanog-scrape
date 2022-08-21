@@ -2,7 +2,8 @@
 
 import argparse
 import csv
-import pprint
+from thefuzz import process
+import re
 import operator
 
 
@@ -30,7 +31,7 @@ import operator
 
 # this assumes that the gsd and the ssd structures have some common fields
 
-BLANK_ENTRY = {
+BLANK_ENTRY = {  # template blank speaker entry
     "NANOG": "",
     "DATE": "",
     "LOCATION": "",
@@ -47,6 +48,25 @@ BLANK_ENTRY = {
     "ORIGIN": "",
 }
 
+PER_NANOG_SPEAKERS = {}  # dict to store per-NANOG breakdown of speakers
+
+CSV_FIELDS = [  # csv export fields in order
+    "NANOG",
+    "DATE",
+    "LOCATION",
+    "TALK_ORDER",
+    "SPEAKER",
+    "AFFILIATION",
+    "TITLE",
+    "TALK_TYPE",
+    "YOUTUBE",
+    "PRESO_FILES",
+    "DURATION_MIN",
+    "TAGS",
+    "KEYWORDS",
+    "ORIGIN",
+]
+
 
 def load_csv(csv_in: str) -> list:
     """load_csv"""
@@ -54,7 +74,7 @@ def load_csv(csv_in: str) -> list:
     with open(csv_in, "r", newline="") as csvfile:
         csv_reader = csv.DictReader(csvfile)
         for row in csv_reader:
-            row["NANOG"] = int(row["NANOG"])
+            row["NANOG"] = int(row["NANOG"])  # make this a real int
             csv_list.append(row)
 
     return csv_list
@@ -75,59 +95,9 @@ def create_merged_entry(search_entry, target_entry):
     - TITLE
     """
 
-    # merged_entry = {
-    #     "NANOG": search_entry["NANOG"],
-    #     "SPEAKER": search_entry["SPEAKER"],
-    #     "TITLE": search_entry["TITLE"],
-    #     "AFFILIATION": search_entry["AFFILIATION"],
-    # }
-
     merged_entry = BLANK_ENTRY
     merged_entry.update(target_entry)
     merged_entry.update(search_entry)
-
-    #     merged_entry["YOUTUBE"] = search_entry["YOUTUBE"]
-    # elif target_entry["YOUTUBE"] != "":
-    #     merged_entry["YOUTUBE"] = target_entry["YOUTUBE"]
-    # else:
-    #     merged_entry["YOUTUBE"] = ""
-
-    # if search_entry["PRESO_FILES"] != "":
-    #     merged_entry["PRESO_FILES"] = search_entry["PRESO_FILES"]
-    # else:
-    #     merged_entry["PRESO_FILES"] = ""
-
-    # if search_entry["ORIGIN"] != "":
-    #     merged_entry["ORIGIN"] = search_entry["ORIGIN"]
-    # elif target_entry["ORIGIN"] != "":
-    #     merged_entry["ORIGIN"] = target_entry["ORIGIN"]
-    # else:
-    #     merged_entry["ORIGIN"] = ""
-
-    # if target_entry["LOCATION"] != "":
-    #     merged_entry["LOCATION"] = target_entry["LOCATION"]
-    # else:
-    #     merged_entry["LOCATION"] = ""
-
-    # if target_entry["DATE"] != "":
-    #     merged_entry["DATE"] = target_entry["DATE"]
-    # else:
-    #     merged_entry["DATE"] = ""
-
-    # if target_entry["DURATION_MIN"] != "":
-    #     merged_entry["DURATION_MIN"] = target_entry["DURATION_MIN"]
-    # else:
-    #     merged_entry["DURATION_MIN"] = ""
-
-    # if target_entry["TAGS"] != "":
-    #     merged_entry["TAGS"] = target_entry["TAGS"]
-    # else:
-    #     merged_entry["TAGS"] = ""
-
-    # if target_entry["KEYWORDS"] != "":
-    #     merged_entry["KEYWORDS"] = target_entry["KEYWORDS"]
-    # else:
-    #     merged_entry["KEYWORDS"] = ""
 
     return merged_entry
 
@@ -140,34 +110,78 @@ def search_entry(entry: dict, target_sd: list):
     :returns: dict with the merged speaker entry
 
     """
-    speaker_entry = list(
+    speaker = []
+    matched_speaker_entry = {}  # dict with the matched speaker entry
+    unmatched_speaker_entry = {}  # dict with the matched speaker entry
+
+    speaker_exact = list(
         filter(
             lambda target_entry: (
-                target_entry["NANOG"] == entry["NANOG"]
-                and target_entry["SPEAKER"] == entry["SPEAKER"]
-                and target_entry["TITLE"] == entry["TITLE"]
+                re.search(
+                    re.escape(entry["SPEAKER"]), target_entry["SPEAKER"], re.IGNORECASE
+                )
+                and re.search(
+                    re.escape(entry["TITLE"]), target_entry["TITLE"], re.IGNORECASE
+                )
             ),
             target_sd,
         )
     )
 
-    if 2 > len(speaker_entry) > 0:
-        # this represents a match on the key fields
-        print(f'matched entry: {entry["NANOG"]} - {entry["TITLE"]}, {entry["SPEAKER"]}')
-        speaker_entry = create_merged_entry(entry, speaker_entry[0])
-    else:
-        # no match, but the NANOG in the target data set exisets
+    if len(speaker_exact) == 0:
         print(
-            f'unmatched entry: {entry["NANOG"]} - {entry["TITLE"]}, {entry["SPEAKER"]}',
+            f'attempting fuzzy match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
         )
-        # speaker_entry = []
-        speaker_entry = None
 
-    return speaker_entry
+        # this is expensive, but should yield something to search on
+        titles = set(e["TITLE"] for e in target_sd)
+        speakers = set(e["SPEAKER"] for e in target_sd)
+        fuzzy_title = process.extractOne(entry["TITLE"], titles)
+        fuzzy_speaker = process.extractOne(entry["SPEAKER"], speakers)
+
+        speaker_fuzzy = list(
+            filter(
+                lambda target_entry: (
+                    re.search(
+                        re.escape(fuzzy_title[0]), target_entry["TITLE"], re.IGNORECASE
+                    )
+                    and re.search(
+                        re.escape(fuzzy_speaker[0]),
+                        target_entry["SPEAKER"],
+                        re.IGNORECASE,
+                    )
+                ),
+                target_sd,
+            )
+        )
+
+        if 2 > len(speaker_fuzzy) > 0:
+            print(
+                f'fuzzy match: {speaker_fuzzy[0]["NANOG"]}: {speaker_fuzzy[0]["SPEAKER"]} - {speaker_fuzzy[0]["TITLE"]}'
+            )
+
+        speaker = speaker_fuzzy
+
+    else:
+        print(f'exact match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}')
+        speaker = speaker_exact
+
+    if 2 > len(speaker) > 0:
+        # we have a match! fuzzy or exact.
+        matched_speaker_entry = create_merged_entry(entry, speaker[0])
+        unmatched_speaker_entry = None
+    else:
+        print(
+            f'unmatched entry: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
+        )
+        matched_speaker_entry = None
+        unmatched_speaker_entry = create_merged_entry(entry, BLANK_ENTRY.copy())
+
+    return (matched_speaker_entry, unmatched_speaker_entry)
 
 
 def filter_nanogs(nog_set, dataset):
-    """TODO: Docstring for filter_nanogs.
+    """filter_nanogs - given a set, return a LoD that has the relevant entries.
 
     :nog_set: set - NANOG meetings to filter for speakers
     :dataset: dataset to filter
@@ -182,12 +196,30 @@ def filter_nanogs(nog_set, dataset):
 def get_nanogs(speaker_data):
     """get_nanogs(speaker_data: list)
 
-    :speaker_data: list of dicts that have the speaker data
+    :speaker_data: list of dicts that have the associated speaker data
     :returns: a set of NANOGs found within the speaker_data
 
     """
     nanogs = set(int(entry["NANOG"]) for entry in speaker_data)
     return set(sorted(nanogs))
+
+
+def write_csv(csvfile_out, fields, dataset):
+    """write_csv - pretty self-evident
+
+    :csvfile_out: path to the csv file to export
+    :fields: list of the fieldnames to export
+    :data: LoD with the rows to be written
+    :returns: nothing
+
+    """
+    with open(csvfile_out, "w", newline="") as csvout:
+        writer = csv.DictWriter(csvout, fieldnames=fields)
+        writer.writeheader()
+        for row in dataset:
+            writer.writerow(row)
+
+    return
 
 
 def main():
@@ -207,9 +239,16 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--csv-out",
-        help="csv file to output",
-        dest="csv_out",
+        "--merged-csv-out",
+        help="csv file to output merged entries",
+        dest="merged_csv_out",
+        action="store",
+        required=False,
+    )
+    parser.add_argument(
+        "--unmatched-csv-out",
+        help="csv file to output unmatched",
+        dest="unmatched_csv_out",
         action="store",
         required=False,
     )
@@ -228,12 +267,21 @@ def main():
     ssd_only = ssd_nanogs.difference(rsd_nanogs)
     intersecting_sd = rsd_nanogs.intersection(ssd_nanogs)
 
-    # filter the datasets to relevant NANOGs only and generate merged entries
+    # filter the datasets to relevant NANOGs
     rsd_nanog_speakers = filter_nanogs(rsd_only, rsd)
     ssd_nanog_speakers = filter_nanogs(ssd_only, ssd)
+    # grabs all of the entries from the scraped speaker data to be used to
+    # search against the raw speaker data
     shared_nanog_speakers = filter_nanogs(intersecting_sd, ssd)
 
-    merged_speakers = []
+    # generate a dict of LoDs containing the raw speaker data keyed by nanog
+    # this speeds up the fuzzy searching
+    for n in intersecting_sd:
+        m = list(filter(lambda e: e["NANOG"] == n, rsd))
+        PER_NANOG_SPEAKERS[n] = m
+
+    merged_speakers = []  # merged entries
+    unmatched_scraped_entries = []  # scraped entries which don't match in the rsd
 
     # first pass - add the NANOGs that are rsd_only into the mix
     for raw_speaker in rsd_nanog_speakers:
@@ -250,34 +298,23 @@ def main():
     # see what we have with the intersection of the ssd content with the rsd
     # content.
     for entry in shared_nanog_speakers:
-        merged_entry = search_entry(entry, rsd)
+        (merged_entry, unmatched_entry) = search_entry(
+            entry, PER_NANOG_SPEAKERS[entry["NANOG"]]
+        )
         if merged_entry:
             merged_speakers.append(merged_entry)
+        else:
+            unmatched_scraped_entries.append(unmatched_entry)
 
+    # sort based on NANOG, then speaker for export
     merged_speakers.sort(key=operator.itemgetter("NANOG", "SPEAKER"))
+    unmatched_scraped_entries.sort(key=operator.itemgetter("NANOG", "SPEAKER"))
 
-    if args.csv_out:
-        with open(args.csv_out, "w", newline="") as csvout:
-            field_names = [
-                "NANOG",
-                "DATE",
-                "LOCATION",
-                "TALK_ORDER",
-                "SPEAKER",
-                "AFFILIATION",
-                "TITLE",
-                "TALK_TYPE",
-                "YOUTUBE",
-                "PRESO_FILES",
-                "DURATION_MIN",
-                "TAGS",
-                "KEYWORDS",
-                "ORIGIN",
-            ]
-            writer = csv.DictWriter(csvout, fieldnames=field_names)
-            writer.writeheader()
-            for row in merged_speakers:
-                writer.writerow(row)
+    if args.merged_csv_out:
+        write_csv(args.merged_csv_out, CSV_FIELDS, merged_speakers)
+
+    if args.unmatched_csv_out:
+        write_csv(args.unmatched_csv_out, CSV_FIELDS, unmatched_scraped_entries)
 
 
 if __name__ == "__main__":
