@@ -10,3 +10,5 @@ historic NANOG agendas in order to build up the speader stats and database.
   from youtube for the various presentations
 - `export-nanog.sh` - a quick shell script to consistently munge things together
   into the CSVs for export
+- `nanog-merge.py` - single use (ideally) tool to facilitate a dump merge with
+  the current NANOG speaker archives
