@@ -95,7 +95,7 @@ def create_merged_entry(search_entry, target_entry):
     - TITLE
     """
 
-    merged_entry = BLANK_ENTRY
+    merged_entry = BLANK_ENTRY.copy()
     merged_entry.update(target_entry)
     merged_entry.update(search_entry)
 
@@ -128,9 +128,14 @@ def search_entry(entry: dict, target_sd: list):
         )
     )
 
-    if len(speaker_exact) == 0:
+    if len(speaker_exact) == 1:
+        print(f'exact match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}')
+        speaker = speaker_exact
+
+    else:
         print(
-            f'attempting fuzzy match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
+            f'attempting fuzzy match: {entry["NANOG"]}: '
+            f'{entry["SPEAKER"]} - {entry["TITLE"]}'
         )
 
         # this is expensive, but should yield something to search on
@@ -154,19 +159,18 @@ def search_entry(entry: dict, target_sd: list):
                 target_sd,
             )
         )
-
-        if 2 > len(speaker_fuzzy) > 0:
+        if len(speaker_fuzzy) > 0:
             print(
-                f'fuzzy match: {speaker_fuzzy[0]["NANOG"]}: {speaker_fuzzy[0]["SPEAKER"]} - {speaker_fuzzy[0]["TITLE"]}'
+                f'fuzzy match: {speaker_fuzzy[0]["NANOG"]}: '
+                f'{speaker_fuzzy[0]["SPEAKER"]} - {speaker_fuzzy[0]["TITLE"]}'
+            )
+            speaker = speaker_fuzzy
+        else:
+            print(
+                f'fuzzy fail: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
             )
 
-        speaker = speaker_fuzzy
-
-    else:
-        print(f'exact match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}')
-        speaker = speaker_exact
-
-    if 2 > len(speaker) > 0:
+    if len(speaker) == 1:
         # we have a match! fuzzy or exact.
         matched_speaker_entry = create_merged_entry(entry, speaker[0])
         unmatched_speaker_entry = None
@@ -177,7 +181,7 @@ def search_entry(entry: dict, target_sd: list):
         matched_speaker_entry = None
         unmatched_speaker_entry = create_merged_entry(entry, BLANK_ENTRY.copy())
 
-    return (matched_speaker_entry, unmatched_speaker_entry)
+    return matched_speaker_entry, unmatched_speaker_entry
 
 
 def filter_nanogs(nog_set, dataset):
@@ -298,16 +302,17 @@ def main():
     # see what we have with the intersection of the ssd content with the rsd
     # content.
     for entry in shared_nanog_speakers:
-        (merged_entry, unmatched_entry) = search_entry(
+        merged_speaker, unmatched_entry = search_entry(
             entry, PER_NANOG_SPEAKERS[entry["NANOG"]]
         )
-        if merged_entry:
-            merged_speakers.append(merged_entry)
-        else:
+        if merged_speaker is not None:
+            merged_speakers.append(merged_speaker)
+
+        if unmatched_entry is not None:
             unmatched_scraped_entries.append(unmatched_entry)
 
     # sort based on NANOG, then speaker for export
-    merged_speakers.sort(key=operator.itemgetter("NANOG", "SPEAKER"))
+    merged_speakers.sort(key=operator.itemgetter("NANOG", "TALK_ORDER", "SPEAKER"))
     unmatched_scraped_entries.sort(key=operator.itemgetter("NANOG", "SPEAKER"))
 
     if args.merged_csv_out:
