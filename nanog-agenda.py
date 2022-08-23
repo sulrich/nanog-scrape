@@ -11,17 +11,40 @@ URL_BASE = ""
 ORIGIN = "archive.nanog.org"
 
 
-def extract_speaker(speaker_cell):
+def extract_speaker(speaker_cell, nanog):
     """
-    sample speaker cell
+    sample speaker cell: NANOG <= 70
+    ------------------
     <td><em><strong>Speakers:</strong></em><br/>
     <ul class="agenda_speakers"><h3 class="txttoggle_action"><li>%%SPEAKER%% ,
     %%AFFILIATION%%</li></h3><div class="text_toggle">%%SPEAKER_BIO%%</div>
     <h3 class="txttoggle_action"></ul></td>
+    ------------------
+
+    sample speaker cell: NANOG >= 71
+    ------------------
+    <td>Conference Opening
+    <a class="abstract" target="_blank" href="/static/published/meetings//NANOG71/daily/day_3.html#talk_1503">
+    <br>[ view full abstract ]
+    </a><br>
+    <p></p>
+    <dl class="speakers">
+    <dt>Speaker</dt>
+    <dd><strong>David Temkin</strong>, Netflix</dd>
+    <dd><strong>Brian Lillie</strong>, Equinix</dd>
+    <dd><strong>Jack Waters</strong>, Zayo</dd>
+    <dd><strong>L Sean Kennedy</strong></dd>
+    </dl>
+    </td>
+
     """
 
     speakers = []
-    speaker_list = speaker_cell.find_all("li")
+    if nanog <= 70:
+        speaker_list = speaker_cell.find_all("li")
+    else:
+        speaker_list = speaker_cell.find_all("dd")
+
     for s in speaker_list:
         # remove trailing punctuation
 
@@ -43,18 +66,23 @@ def extract_speaker(speaker_cell):
     return speakers
 
 
-def extract_title(abstract_cell):
+def extract_title(abstract_cell, nanog):
     """
     returns the extracted title from the legacy agendas
-    TODO(sulrich): this needs to handle the cases where there's no H3 to grab
-    but there's something in here that's representative of the title.
     """
     title = ""
-    toggled_title = abstract_cell.find("h3", attrs={"class": "txttoggle_action"})
-    if toggled_title:
-        title = toggled_title.text.strip()
+
+    if nanog <= 70:
+        # seems to cover all the bases
+        toggled_title = abstract_cell.find("h3", attrs={"class": "txttoggle_action"})
+        if toggled_title:
+            title = toggled_title.text.strip()
+        else:
+            title = abstract_cell.text.strip()
     else:
-        title = abstract_cell.text.strip()
+        # the text up to the anchor holding the abstract is the title
+        first_anchor = abstract_cell.find("a")
+        title = first_anchor.previousSibling.strip()
 
     whitespace_re = re.compile(r"[\n\r\t]")
     title = whitespace_re.sub(" ", title)
@@ -65,7 +93,7 @@ def extract_title(abstract_cell):
     return title
 
 
-def extract_presentation(preso):
+def extract_presentation(preso, nanog):
     """
     sample presentation cell
     <td><img alt="youtube" height="12" src="/images/doc_icons/youtube_icon.gif"/><a
@@ -175,32 +203,54 @@ def gen_talk_rows(talk):
     return talk_info
 
 
-def process_agenda_table(agenda_table):
-    heading = []
-    for th in agenda_table.thead.find_all("th"):
-        heading.append(th.text.strip())
-
-    # heading
+def process_agenda_table(agenda_table, nanog):
+    # heading = []
+    # for th in agenda_table.find_all("th"):
+    #     heading.append(th.text.strip())
+    #
+    # handy for figuring out what the table structures look like
+    # print(heading)
+    #
+    # agenda fields: nanog 13-70
     # ['Time/Webcast:', 'Room:', 'Topic/Abstract:', 'Presenter/Sponsor:', 'Presentation Files:']
+    #
+    # agenda fields: nango 71+
+    # ['Time', 'Location', 'Topic', 'Video Files', 'Presentation Files']
 
     # importing this here for consistency
     global ORIGIN
 
     nanog_talks = []
-    for tr in agenda_table.tbody.find_all("tr"):
+
+    rows = agenda_table.find_all("tr")
+    for tr in rows:
         td = tr.find_all("td")
         if len(td) < 2:
             continue
 
-        (videos, presos) = extract_presentation(td[4])
-        talk = {
-            "speakers": extract_speaker(td[3]),
-            "title": extract_title(td[2]),
-            "timeslot": td[0].text,
-            "presentation": presos,
-            "video": videos,
-            "origin": ORIGIN,
-        }
+        if nanog <= 70:
+            # the following works up to NANOG 70
+            (videos, presos) = extract_presentation(td[4], nanog)
+            talk = {
+                "speakers": extract_speaker(td[3], nanog),
+                "title": extract_title(td[2], nanog),
+                "timeslot": td[0].text.strip(),
+                "presentation": presos,
+                "video": videos,
+                "origin": ORIGIN,
+            }
+        else:
+            (videos, _) = extract_presentation(td[3], nanog)
+            (_, presos) = extract_presentation(td[4], nanog)
+            talk = {
+                "speakers": extract_speaker(td[2], nanog),
+                "title": extract_title(td[2], nanog),
+                "timeslot": td[0].text.strip(),
+                "presentation": presos,
+                "video": videos,
+                "origin": ORIGIN,
+            }
+
         talk_row = gen_talk_rows(talk)
         if talk_row is not None:
             for r in talk_row:
@@ -209,17 +259,20 @@ def process_agenda_table(agenda_table):
     return nanog_talks
 
 
-def get_agenda_tables(agenda_file):
+def get_agenda_tables(agenda_file, nanog):
     with open(agenda_file) as a_file:
         soup = BeautifulSoup(a_file, "html.parser")
 
-    agenda_tables = soup.find_all(
-        "table", attrs={"class": "table_agenda sticky-enabled"}
-    )
+    # NANOG specific overrides
+    table_attr = {}
+    if nanog <= 70:
+        table_attr = {"class": "table_agenda sticky-enabled"}
+
+    agenda_tables = soup.find_all("table", attrs=table_attr)
 
     export_talks = []
     for agenda in agenda_tables:
-        talks = process_agenda_table(agenda)
+        talks = process_agenda_table(agenda, nanog)
         export_talks.extend(talks)
 
     return export_talks
@@ -233,6 +286,7 @@ def main():
         help="nanog number",
         dest="NANOG_NUM",
         action="store",
+        type=int,
         required=True,
     )
     parser.add_argument(
@@ -269,7 +323,7 @@ def main():
     global URL_BASE
     URL_BASE = args.url_base
 
-    agenda = get_agenda_tables(args.agenda)
+    agenda = get_agenda_tables(args.agenda, NANOG_NUM)
 
     if args.csv_file:
         with open(args.csv_file, "w", newline="") as f:
