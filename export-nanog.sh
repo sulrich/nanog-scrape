@@ -17,7 +17,7 @@ EOF
 export-agendas() {
   local AGENDA_HEADER="NANOG,SPEAKER,AFFILIATION,TITLE,YOUTUBE,PRESO_FILES,ORIGIN"
   local AGENDA_START=13
-  local AGENDA_END=70
+  local AGENDA_END=76
   for (( i = AGENDA_START; i <= AGENDA_END; i++ ))
   do
     echo "scraping agenda: NANOG $i"
