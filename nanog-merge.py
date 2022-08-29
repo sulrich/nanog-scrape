@@ -48,7 +48,11 @@ BLANK_ENTRY = {  # template blank speaker entry
     "ORIGIN": "",
 }
 
-PER_NANOG_SPEAKERS = {}  # dict to store per-NANOG breakdown of speakers
+# dict to store per-NANOG breakdown of speakers
+PER_NANOG_SPEAKERS = {}
+
+# dict to store dict of NANOG dates and locations, keyed by NANOG
+NANOG_INFO = {}
 
 CSV_FIELDS = [  # csv export fields in order
     "NANOG",
@@ -98,6 +102,10 @@ def create_merged_entry(search_entry, target_entry):
     merged_entry = BLANK_ENTRY.copy()
     merged_entry.update(target_entry)
     merged_entry.update(search_entry)
+
+    # override data/location with blessed info
+    merged_entry["DATE"] = NANOG_INFO[search_entry["NANOG"]]["DATE"]
+    merged_entry["LOCATION"] = NANOG_INFO[search_entry["NANOG"]]["LOCATION"]
 
     return merged_entry
 
@@ -226,6 +234,24 @@ def write_csv(csvfile_out, fields, dataset):
     return
 
 
+def load_nanog_info(nanog_info_csv):
+    """load_nanog_info(nanog_info_csv)
+
+    :nanog_info_csv: path to CSV with NANOG info data
+    :returns: DoD containing the nanog dates and locations keyed by NANOG #
+
+    """
+    _nanog_info = {}
+    ninfo = load_csv(nanog_info_csv)
+    for n in ninfo:
+        _nanog_info[n["NANOG"]] = {
+            "DATE": n["DATE"],
+            "LOCATION": n["LOCATION"],
+        }
+
+    return _nanog_info
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -239,6 +265,13 @@ def main():
         "--scraped-speaker-data",
         help="scraped speaker data",
         dest="scraped_speaker_data",
+        action="store",
+        required=True,
+    )
+    parser.add_argument(
+        "--nanog-dates-locs",
+        help="NANOG dates and locations CSV",
+        dest="nanog_dates_locs",
         action="store",
         required=True,
     )
@@ -260,6 +293,9 @@ def main():
 
     rsd = load_csv(args.raw_speaker_data)
     ssd = load_csv(args.scraped_speaker_data)
+
+    global NANOG_INFO
+    NANOG_INFO = load_nanog_info(args.nanog_dates_locs)
 
     # the data sets are not entirely aligned.  some NANOGs are tracked only in
     # one of the datasets.  get a list of the respective raw and scraped NANOGs
