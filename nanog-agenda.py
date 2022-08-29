@@ -5,6 +5,7 @@ import argparse
 import re
 import csv
 import pprint
+from thefuzz import process
 
 NANOG_NUM = 0
 URL_BASE = ""
@@ -128,6 +129,39 @@ def extract_presentation(preso, nanog):
     return (video_urls, preso_urls)
 
 
+def fuzzy_preso_url(speakers, presos):
+    preso_map = {}
+    # create a reasonable response string for filtering, in post-process
+    preso_scrunch = "|".join(presos)
+
+    for s in speakers:
+        preso_score = 0
+        preso_url = ""
+        s_preso = process.extractOne(s[0], presos)  # speaker match
+        if s[1] != "":
+            a_preso = process.extractOne(s[1], presos)  # affilliation match
+        else:
+            a_preso = (0, 0)
+
+        if s_preso[1] >= a_preso[1]:
+            preso_score = s_preso[1]
+            preso_url = s_preso[0]
+        else:
+            preso_score = a_preso[1]
+            preso_url = a_preso[0]
+
+        if preso_score >= 50:
+            # reasonably high quality match
+            preso_map[s[0]] = preso_url
+        else:
+            tmp_ = (
+                f"lo-quality preso match: ({s_preso[1]}/{a_preso[1]}) - {preso_scrunch}"
+            )
+            preso_map[s[0]] = tmp_
+
+    return preso_map
+
+
 def gen_talk_rows(talk):
     """gen_talk_rows emits a list of strings that describe a talk. for panel
     discussions where there are multiple speakers, these are unrolled into a
@@ -154,9 +188,16 @@ def gen_talk_rows(talk):
     else:
         video = ""
 
-    if len(talk["presentation"]) > 1:
-        presos = "|".join(talk["presentation"])
-    elif len(talk["presentation"]) == 1:
+    unroll_presentations = False  # do we unroll presentation urls?
+    presos = ""  # handling of presentation urls
+    preso_map = {}
+
+    if len(talk["speakers"]) > 1 and len(talk["presentation"]) > 1:
+        unroll_presentations = True
+        preso_map = fuzzy_preso_url(talk["speakers"], talk["presentation"])
+    elif len(talk["speakers"]) > 1 and len(talk["presentation"]) == 1:
+        presos = talk["presentation"][0]
+    elif len(talk["speakers"]) == 1 and len(talk["presentation"]) == 1:
         presos = talk["presentation"][0]
     else:
         presos = ""
@@ -166,6 +207,7 @@ def gen_talk_rows(talk):
     # do something reasonable here and aren't suppressing hackathon readouts,
     # etc.
     # TODO(sulrich): how do we best handle "women in tech lunches"?
+
     if re.search(
         "(break|breakfast|beer|social event|lunch|hackathon)",
         talk["title"],
@@ -174,7 +216,19 @@ def gen_talk_rows(talk):
         talk_info = None
         return
 
-    if len(talk["speakers"]) > 1:
+    if len(talk["speakers"]) > 1 and unroll_presentations:
+        for s in talk["speakers"]:
+            row = [
+                NANOG_NUM,
+                s[0],
+                s[1],
+                talk["title"],
+                video,
+                preso_map[s[0]],
+                talk["origin"],
+            ]
+            talk_info.append(row)
+    elif len(talk["speakers"]) > 1 and not unroll_presentations:
         for s in talk["speakers"]:
             row = [
                 NANOG_NUM,
