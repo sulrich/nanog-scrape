@@ -327,12 +327,18 @@ def main():
     for raw_speaker in rsd_nanog_speakers:
         tmp_spkr = BLANK_ENTRY.copy()
         tmp_spkr.update(raw_speaker)
+        # override data/location with blessed info
+        tmp_spkr["DATE"] = NANOG_INFO[raw_speaker["NANOG"]]["DATE"]
+        tmp_spkr["LOCATION"] = NANOG_INFO[raw_speaker["NANOG"]]["LOCATION"]
         merged_speakers.append(tmp_spkr)
 
     # second pass - add the NANOGs that are ssd_only into the mix
     for scraped_speaker in ssd_nanog_speakers:
         tmp_spkr = BLANK_ENTRY.copy()
         tmp_spkr.update(scraped_speaker)
+        # override data/location with blessed info
+        tmp_spkr["DATE"] = NANOG_INFO[scraped_speaker["NANOG"]]["DATE"]
+        tmp_spkr["LOCATION"] = NANOG_INFO[scraped_speaker["NANOG"]]["LOCATION"]
         merged_speakers.append(tmp_spkr)
 
     # see what we have with the intersection of the ssd content with the rsd
