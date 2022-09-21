@@ -2,10 +2,10 @@
 
 import argparse
 import csv
-from thefuzz import process
-import re
 import operator
+import re
 
+from thefuzz import process
 
 # nanog-merge.python3
 #
@@ -30,7 +30,6 @@ import operator
 #
 
 # this assumes that the gsd and the ssd structures have some common fields
-
 BLANK_ENTRY = {  # template blank speaker entry
     "NANOG": "",
     "DATE": "",
@@ -111,11 +110,15 @@ def create_merged_entry(search_entry, target_entry):
 
 
 def search_entry(entry: dict, target_sd: list):
-    """TODO: Docstring for search_entry.
+    """search_entry - performs a logic-addled fuzzy search for a given entry in
+    the target speaker data list
 
     :speaker_entry: dict containing the scraped entry
     :target_sd: list of dicts containing the speaker data to sort through
-    :returns: dict with the merged speaker entry
+    :returns:
+        - matched_speaker_entry - a dict with the relevant merged fields or None
+        - unmatched_speaker_entry - a dict with the relevant unmerged speaker
+          data fields or None
 
     """
     speaker = []
@@ -289,6 +292,13 @@ def main():
         action="store",
         required=False,
     )
+    parser.add_argument(
+        "--fullmerge",
+        help="fully merge elements into merge-csv-out",
+        dest="fullmerge",
+        action="store_true",
+        required=False,
+    )
     args = parser.parse_args()
 
     rsd = load_csv(args.raw_speaker_data)
@@ -345,7 +355,10 @@ def main():
             merged_speakers.append(merged_speaker)
 
         if unmatched_entry is not None:
-            unmatched_scraped_entries.append(unmatched_entry)
+            if args.fullmerge:
+                merged_speakers.append(unmatched_entry)
+            else:
+                unmatched_scraped_entries.append(unmatched_entry)
 
     # sort based on NANOG, then speaker for export
     merged_speakers.sort(key=operator.itemgetter("NANOG", "TALK_ORDER", "SPEAKER"))

@@ -3,3 +3,4 @@ tabula==1.0.5
 tabula_py==2.3.0
 thefuzz==0.19.0
 youtube_transcript_api==0.4.4
+python-Levenshtein

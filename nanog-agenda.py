@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-from bs4 import BeautifulSoup
 import argparse
-import re
 import csv
 import pprint
+import re
+
+from bs4 import BeautifulSoup
 from thefuzz import process
 
 NANOG_NUM = 0
@@ -206,15 +207,24 @@ def gen_talk_rows(talk):
     # non-empty status of the video and the preso fields are to ensure that we
     # do something reasonable here and aren't suppressing hackathon readouts,
     # etc.
-    # TODO(sulrich): how do we best handle "women in tech lunches"?
-
+    #
+    # so. many. lunch variations
     if re.search(
-        "(break|breakfast|beer|social event|lunch|hackathon)",
+        "(break|breakfast|beer|social event|hackathon|espresso bar"
+        "|refreshments|vendor collaboration room|pgp key"
+        "|(newcomers|monday|tuesday|welcome|open) lunch|^lunch$|^social|cocktail)",
         talk["title"],
         re.IGNORECASE,
     ) and (video == "" and presos == ""):
         talk_info = None
         return
+
+    # there are some sneaky speaker variations for some agenda items.
+    for _s in talk["speakers"]:
+        if re.search("(on your own|^sponsor)", _s[0],
+                     re.IGNORECASE,) and (video == "" and presos == ""):
+            talk_info = None
+            return
 
     if len(talk["speakers"]) > 1 and unroll_presentations:
         for s in talk["speakers"]:
