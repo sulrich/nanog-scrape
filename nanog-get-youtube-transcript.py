@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
 
-import os.path
 import argparse
 import csv
-import traceback
 import logging
+import os.path
+import traceback
+from urllib.parse import parse_qs, urlparse
 
-from urllib.parse import urlparse, parse_qs
-
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api import _errors
+from youtube_transcript_api import YouTubeTranscriptApi, _errors
 from youtube_transcript_api.formatters import TextFormatter
 
 
@@ -52,26 +50,28 @@ def getYoutubeTranscript(outdir, nanog_num, url):
             f"error transcript previously unavailable: {video_id} {error_path} - {url}"
         )
         return error
-    else:
-        try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
-            # turns the transcript into a text string.
-            formatter = TextFormatter()
-            formatted = formatter.format_transcript(transcript)
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
-            # write it out to a file.
-            with open(transcript_path, "w", encoding="utf-8") as text_file:
-                text_file.write(formatted)
+        # turns the transcript into a text string.
+        formatter = TextFormatter()
+        formatted = formatter.format_transcript(transcript)
 
-            return "captured transcript: " + transcript_path
-        # there are videos for which there are no captions generated. log these
-        except (_errors.TranscriptsDisabled, _errors.NoTranscriptFound):
-            with open(error_path, "w", encoding="utf-8") as error_log:
-                traceback.print_exc(file=error_log)
+        # write it out to a file.
+        with open(transcript_path, "w", encoding="utf-8") as text_file:
+            text_file.write(formatted)
 
-            error = f"unable to capture transcript: {video_id} exception: {error_path} - {url}"
-            return error
+        return "captured transcript: " + transcript_path
+    # there are videos for which there are no captions generated. log these
+    except (_errors.TranscriptsDisabled, _errors.NoTranscriptFound):
+        with open(error_path, "w", encoding="utf-8") as error_log:
+            traceback.print_exc(file=error_log)
+
+        error = (
+            f"unable to capture transcript: {video_id} exception: {error_path} - {url}"
+        )
+        return error
 
 
 def main():
