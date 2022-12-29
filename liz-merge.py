@@ -166,6 +166,7 @@ def main():
         tmp_spkr["TAGS"] = tag_speaker["TAGS"]
         tmp_spkr["TOPICS"] = tag_speaker["TOPICS"]
         tmp_spkr["ACADEMIC"] = tag_speaker["ACADEMIC"]
+        tmp_spkr["AFFILIATION"] = tag_speaker["AFFILIATION"]
         tmp_spkr["TALK_TYPE"] = tag_speaker["TALK_TYPE"]
         if tmp_spkr["YOUTUBE"] != "":
             tmp_spkr["YOUTUBE"] = normalize_youtube(tmp_spkr["YOUTUBE"])
