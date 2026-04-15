@@ -21,7 +21,7 @@ export-agendas() {
   for (( i = AGENDA_START; i <= AGENDA_END; i++ ))
   do
     echo "scraping agenda: NANOG $i"
-    nanog-agenda.py --nanog "$i" --url archive.nanog.org \
+    uv run nanog-agenda.py --nanog "$i" --url archive.nanog.org \
       --csv "csv/nanog-$i-agenda.csv" "agendas/nanog$i-agenda.html"
   done
 
@@ -35,20 +35,45 @@ export-agendas() {
 ## export-attendees: output the attendee lists
 export-attendees() {
   local ATT_START=12
-  local ATT_END=63
+  local ATT_END=96
   local ATT_HTML_END=60
+
+  # NANOG 12-60: legacy HTML (archive.nanog.org)
   for (( i = ATT_START; i <= ATT_HTML_END; i++ ))
   do
     echo "scraping attendees: NANOG $i"
-    nanog-attendees.py --nanog "$i" \
+    uv run nanog-attendees.py --nanog "$i" \
       --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.html"
   done
 
-  for i in 61 62 63
+  # NANOG 61-78: PDF (archive.nanog.org / storage.googleapis.com)
+  for (( i = 61; i <= 76; i++ ))
   do
     echo "scraping attendees: NANOG $i (pdf)"
-    nanog-attendees.py --nanog "$i" \
+    uv run nanog-attendees.py --nanog "$i" \
       --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.pdf"
+  done
+  for i in 77 78
+  do
+    echo "scraping attendees: NANOG $i (pdf)"
+    uv run nanog-attendees.py --nanog "$i" \
+      --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.pdf"
+  done
+
+  # NANOG 79-83: new-style HTML (nanog.org server-rendered)
+  for (( i = 79; i <= 83; i++ ))
+  do
+    echo "scraping attendees: NANOG $i (html)"
+    uv run nanog-attendees.py --nanog "$i" \
+      --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.html"
+  done
+
+  # NANOG 84-96: JSON API (nanog.org)
+  for (( i = 84; i <= 96; i++ ))
+  do
+    echo "scraping attendees: NANOG $i (json)"
+    uv run nanog-attendees.py --nanog "$i" \
+      --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.json"
   done
 
   echo "consolidating NANOG attendees"
