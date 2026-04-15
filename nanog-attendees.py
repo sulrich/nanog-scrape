@@ -1,7 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "beautifulsoup4",
+#     "tabula-py",
+# ]
+# ///
 
 from bs4 import BeautifulSoup
 import argparse
+import json
 import re
 import csv
 import tabula
@@ -65,6 +73,62 @@ def process_attendee_table(attendee_table, parse_names):
     return attendees
 
 
+def process_new_html_attendees(attendees_file):
+    """parse the nanog.org attendee pages used from NANOG 79-83.
+
+    these have a table with columns: First Name, Last Name, Company, ASN, MEET, Type.
+    NANOG 79 uses <th> for row numbers alongside <td> cells.
+    NANOG 80-83 use the agenda-table-body class with all <td> cells.
+    """
+    with open(attendees_file) as a_file:
+        soup = BeautifulSoup(a_file, "html.parser")
+
+    attendees = []
+    for tr in soup.find_all("tr"):
+        td = tr.find_all("td")
+        if len(td) < 3:
+            continue
+
+        fname = td[0].text.strip()
+        lname = td[1].text.strip()
+        org = td[2].text.strip()
+
+        if fname == "" and lname == "":
+            continue
+        # skip header-like rows
+        if fname == "First Name":
+            continue
+        # normalize em-dash placeholder to empty
+        if org == "\u2014":
+            org = ""
+
+        attendees.append([NANOG_NUM, lname, fname, org])
+
+    return attendees
+
+
+def parse_attendees_json(attendees_json):
+    """parse the JSON attendee data used from NANOG 84-96.
+
+    JSON is an array of objects with keys: first_name, last_name, company.
+    """
+    with open(attendees_json) as f:
+        data = json.load(f)
+
+    attendees = []
+    for entry in data:
+        fname = (entry.get("first_name") or "").strip()
+        lname = (entry.get("last_name") or "").strip()
+        org = (entry.get("company") or "").strip()
+
+        if fname == "" and lname == "":
+            continue
+
+        attendees.append([NANOG_NUM, lname, fname, org])
+
+    return attendees
+
+
 def get_attendees_table(attendees_file):
     """
     there should really only be 1 attendee table in the page.
@@ -104,7 +168,7 @@ def get_attendees_table(attendees_file):
 def pdf_text_clean(cell_text):
     text = cell_text.strip()
 
-    text = re.sub("\s+", " ", text)
+    text = re.sub(r"\s+", " ", text)
     return text
 
 
@@ -159,8 +223,12 @@ def main():
     global NANOG_NUM
     NANOG_NUM = args.NANOG_NUM
 
-    if "pdf" in args.attendees:
+    if args.attendees.endswith(".json"):
+        attendees = parse_attendees_json(args.attendees)
+    elif args.attendees.endswith(".pdf"):
         attendees = parse_attendees_pdf(args.attendees)
+    elif NANOG_NUM in range(79, 84):
+        attendees = process_new_html_attendees(args.attendees)
     else:
         attendees = get_attendees_table(args.attendees)
 
