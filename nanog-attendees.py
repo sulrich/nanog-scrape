@@ -185,17 +185,62 @@ def fix_pdf_names(name):
 
 
 def parse_attendees_pdf(attendee_pdf):
-    attendee_table = tabula.read_pdf(attendee_pdf, output_format="json", pages="all")
-    # we might need to adjust this for each pdf table
-    attendees = []
-    for data_table in attendee_table:
-        # data_table = attendee_table[1]["data"]
-        for row in data_table["data"]:
-            (fname, lname) = fix_pdf_names(pdf_text_clean(row[0]["text"]))
-            org = pdf_text_clean(row[1]["text"])
+    """parse PDF attendee lists across several layout eras.
 
-            attendee = [NANOG_NUM, lname, fname, org]
-            attendees.append(attendee)
+    NANOG 61-66: 3 columns - "Name" (Last, First), Company, ASN
+        66-67 may have a leading empty column.
+    NANOG 67:    3 columns - empty, "Name" (Last, First), Organization
+    NANOG 68-69: inconsistent extraction, First/Last may land in
+        separate columns or be merged with company.
+    NANOG 70-77: 4 columns - Last Name, First Name, Company, ASN
+    NANOG 78:    4 columns - Last Name, First Name, ASN, Company (swapped)
+    """
+    attendee_table = tabula.read_pdf(attendee_pdf, output_format="json", pages="all")
+    attendees = []
+
+    # headers to skip
+    skip_names = {"Name", "Full Name", "Last Name", "First Name", "Company",
+                  "Organization", "ASN", ""}
+
+    for data_table in attendee_table:
+        for row in data_table["data"]:
+            cells = [pdf_text_clean(cell["text"]) for cell in row]
+
+            # skip rows that are too short or are headers/titles
+            if len(cells) < 2:
+                continue
+            if cells[0] in skip_names and cells[1] in skip_names:
+                continue
+            # skip title rows like "NANOG 61 Attendees"
+            if re.search(r"NANOG\s+\d+", cells[0]):
+                continue
+
+            if NANOG_NUM in range(61, 70):
+                # "Last, First" in a single column, possibly with a
+                # leading empty column (NANOG 66-67)
+                name_col = 0
+                org_col = 1
+                # detect leading empty column
+                if cells[0] == "" and len(cells) >= 3:
+                    name_col = 1
+                    org_col = 2
+                (fname, lname) = fix_pdf_names(cells[name_col])
+                org = cells[org_col] if len(cells) > org_col else ""
+            elif NANOG_NUM == 78:
+                # Last, First, ASN, Company (company is col 3)
+                lname = cells[0]
+                fname = cells[1] if len(cells) > 1 else ""
+                org = cells[3] if len(cells) > 3 else ""
+            else:
+                # NANOG 70-77: Last, First, Company, ASN
+                lname = cells[0]
+                fname = cells[1] if len(cells) > 1 else ""
+                org = cells[2] if len(cells) > 2 else ""
+
+            if lname == "" and fname == "":
+                continue
+
+            attendees.append([NANOG_NUM, lname, fname, org])
 
     return attendees
 
