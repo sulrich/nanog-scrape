@@ -40,7 +40,7 @@ No test framework is configured. Validation is manual (inspect CSV output).
   - Legacy HTML from archive.nanog.org (NANOG 12-60)
   - PDF via tabula (NANOG 61-78). Multiple sub-eras: 61-66 have comma-separated "Last, First" names; 66-67 have a leading empty column; 70-77 have separate Last/First/Company/ASN columns; 78 swaps ASN and Company columns.
   - nanog.org server-rendered HTML (NANOG 79-83)
-  - nanog.org JSON API (NANOG 84-96)
+  - nanog.org JSON API (NANOG 84-98). Endpoint: `https://nanog.org/events/nanog-{N}/api/v1/attendees/`. Cloudflare blocks curl, so fetch it from a real browser session and save it as `attendees/nanog{N}-attendees.json` (2-space indent).
 - `nanog-get-youtube-transcript.py` - Downloads YouTube closed-caption transcripts, caches to text files.
 - `nanog-merge.py` - One-shot merge of manually curated "raw" speaker data with scraped data using fuzzy matching (thefuzz) on speaker name + title + NANOG number.
 - `liz-merge.py` - Merges "golden master" data with a tagged fork to add TAGS/TOPICS/ACADEMIC metadata.

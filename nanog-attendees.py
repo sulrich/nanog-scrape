@@ -108,7 +108,7 @@ def process_new_html_attendees(attendees_file):
 
 
 def parse_attendees_json(attendees_json):
-    """parse the JSON attendee data used from NANOG 84-96.
+    """parse the JSON attendee data used from NANOG 84-98.
 
     JSON is an array of objects with keys: first_name, last_name, company.
     """

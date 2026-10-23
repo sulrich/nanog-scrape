@@ -35,7 +35,7 @@ export-agendas() {
 ## export-attendees: output the attendee lists
 export-attendees() {
   local ATT_START=12
-  local ATT_END=97
+  local ATT_END=98
   local ATT_HTML_END=60
 
   # NANOG 12-60: legacy HTML (archive.nanog.org)
@@ -68,8 +68,8 @@ export-attendees() {
       --csv "csv/nanog-$i-attendees.csv" "attendees/nanog$i-attendees.html"
   done
 
-  # NANOG 84-97: JSON API (nanog.org)
-  for (( i = 84; i <= 97; i++ ))
+  # NANOG 84-98: JSON API (nanog.org)
+  for (( i = 84; i <= 98; i++ ))
   do
     echo "scraping attendees: NANOG $i (json)"
     uv run nanog-attendees.py --nanog "$i" \
