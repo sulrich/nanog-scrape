@@ -24,6 +24,9 @@ uv run nanog-attendees.py --nanog 96 --csv csv/nanog-96-attendees.csv attendees/
 ./export-nanog.sh export-agendas
 ./export-nanog.sh export-attendees
 
+# first-timer / retention report (window defaults to NANOG 83 through the newest meeting in the CSV)
+uv run nanog-first-timers.py attendees-12-98.csv --people-csv csv/attendees-since-83.csv
+
 # download YouTube transcripts
 uv run nanog-get-youtube-transcript.py --csv agendas-13-76.csv --output transcripts/
 ```
@@ -42,6 +45,7 @@ No test framework is configured. Validation is manual (inspect CSV output).
   - nanog.org server-rendered HTML (NANOG 79-83)
   - nanog.org JSON API (NANOG 84-98). Endpoint: `https://nanog.org/events/nanog-{N}/api/v1/attendees/`. Cloudflare blocks curl, so fetch it from a real browser session and save it as `attendees/nanog{N}-attendees.json` (2-space indent).
 - `nanog-get-youtube-transcript.py` - Downloads YouTube closed-caption transcripts, caches to text files.
+- `nanog-first-timers.py` - Retention report from the consolidated attendee CSV. Splits everyone attending since `--since` (default 83) into veterans (first attended before `--veteran-before`, default 78) and newcomers (first attended at `--since` or later), with bucketed meeting counts and newcomer -> regular conversion by first meeting. People are matched on last name + first word of first name.
 - `nanog-merge.py` - One-shot merge of manually curated "raw" speaker data with scraped data using fuzzy matching (thefuzz) on speaker name + title + NANOG number.
 - `liz-merge.py` - Merges "golden master" data with a tagged fork to add TAGS/TOPICS/ACADEMIC metadata.
 - `export-nanog.sh` - Orchestration: batch-runs scrapers, consolidates per-meeting CSVs into master files, cleans up scratch files.
