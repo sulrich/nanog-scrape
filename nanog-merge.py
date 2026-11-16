@@ -147,13 +147,13 @@ def search_entry(entry: dict, target_sd: list):
     )
 
     if len(speaker_exact) == 1:
-        print(f'exact match: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}')
+        print(f"exact match: {entry['NANOG']}: {entry['SPEAKER']} - {entry['TITLE']}")
         speaker = speaker_exact
 
     else:
         print(
-            f'attempting fuzzy match: {entry["NANOG"]}: '
-            f'{entry["SPEAKER"]} - {entry["TITLE"]}'
+            f"attempting fuzzy match: {entry['NANOG']}: "
+            f"{entry['SPEAKER']} - {entry['TITLE']}"
         )
 
         # this is expensive, but should yield something to search on
@@ -179,13 +179,13 @@ def search_entry(entry: dict, target_sd: list):
         )
         if len(speaker_fuzzy) > 0:
             print(
-                f'fuzzy match: {speaker_fuzzy[0]["NANOG"]}: '
-                f'{speaker_fuzzy[0]["SPEAKER"]} - {speaker_fuzzy[0]["TITLE"]}'
+                f"fuzzy match: {speaker_fuzzy[0]['NANOG']}: "
+                f"{speaker_fuzzy[0]['SPEAKER']} - {speaker_fuzzy[0]['TITLE']}"
             )
             speaker = speaker_fuzzy
         else:
             print(
-                f'fuzzy fail: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
+                f"fuzzy fail: {entry['NANOG']}: {entry['SPEAKER']} - {entry['TITLE']}"
             )
 
     if len(speaker) == 1:
@@ -194,7 +194,7 @@ def search_entry(entry: dict, target_sd: list):
         unmatched_speaker_entry = None
     else:
         print(
-            f'unmatched entry: {entry["NANOG"]}: {entry["SPEAKER"]} - {entry["TITLE"]}'
+            f"unmatched entry: {entry['NANOG']}: {entry['SPEAKER']} - {entry['TITLE']}"
         )
         matched_speaker_entry = None
         unmatched_speaker_entry = create_merged_entry(entry, BLANK_ENTRY.copy())

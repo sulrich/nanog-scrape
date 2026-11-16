@@ -229,8 +229,11 @@ def gen_talk_rows(talk):
 
     # there are some sneaky speaker variations for some agenda items.
     for _s in talk["speakers"]:
-        if re.search("(on your own|^sponsor)", _s[0],
-                     re.IGNORECASE,) and (video == "" and presos == ""):
+        if re.search(
+            "(on your own|^sponsor)",
+            _s[0],
+            re.IGNORECASE,
+        ) and (video == "" and presos == ""):
             talk_info = None
             return
 
