@@ -12,6 +12,7 @@ import argparse
 import json
 import re
 import csv
+import sys
 import tabula
 import pprint
 
@@ -173,15 +174,30 @@ def pdf_text_clean(cell_text):
 
 
 def fix_pdf_names(name):
+    """split "Last, First" into (fname, lname), or None if there's no comma."""
     try:
         (lname, fname) = re.split(",", name.strip())
     except ValueError:
-        fname = "malformed attendee:"
-        lname = name.strip()
+        return None
 
-    lname = lname.strip()
-    fname = fname.strip()
-    return (fname, lname)
+    return (fname.strip(), lname.strip())
+
+
+# tabula's default table detection (--guess) misses most of the pages in
+# some of these PDFs (NANOG 68 yields nothing at all). those meetings use
+# stream mode instead. where stream mode runs adjacent columns together,
+# explicit column boundaries keep them apart. boundaries are x positions in
+# points, just left of each column header on page 1. the header only
+# appears on page 1 but the layout is the same on every page.
+PDF_TABULA_OPTIONS = {
+    66: {"stream": True, "guess": False},
+    67: {"stream": True, "guess": False},
+    68: {"stream": True, "guess": False},
+    69: {"stream": True, "guess": False, "columns": [130, 245, 405]},
+    70: {"stream": True, "guess": False, "columns": [80, 143, 400]},
+    75: {"stream": True, "guess": False},
+    78: {"stream": True, "guess": False, "columns": [112, 177, 240]},
+}
 
 
 def parse_attendees_pdf(attendee_pdf):
@@ -190,17 +206,30 @@ def parse_attendees_pdf(attendee_pdf):
     NANOG 61-66: 3 columns - "Name" (Last, First), Company, ASN
         66-67 may have a leading empty column.
     NANOG 67:    3 columns - empty, "Name" (Last, First), Organization
-    NANOG 68-69: inconsistent extraction, First/Last may land in
-        separate columns or be merged with company.
+    NANOG 68:    3 columns - "Full Name" (Last, First), Company, ASN
+    NANOG 69:    4 columns - First Name, Last Name, Company, ASN
     NANOG 70-77: 4 columns - Last Name, First Name, Company, ASN
     NANOG 78:    4 columns - Last Name, First Name, ASN, Company (swapped)
     """
-    attendee_table = tabula.read_pdf(attendee_pdf, output_format="json", pages="all")
+    attendee_table = tabula.read_pdf(
+        attendee_pdf,
+        output_format="json",
+        pages="all",
+        **PDF_TABULA_OPTIONS.get(NANOG_NUM, {}),
+    )
     attendees = []
 
     # headers to skip
-    skip_names = {"Name", "Full Name", "Last Name", "First Name", "Company",
-                  "Organization", "ASN", ""}
+    skip_names = {
+        "Name",
+        "Full Name",
+        "Last Name",
+        "First Name",
+        "Company",
+        "Organization",
+        "ASN",
+        "",
+    }
 
     for data_table in attendee_table:
         for row in data_table["data"]:
@@ -215,7 +244,7 @@ def parse_attendees_pdf(attendee_pdf):
             if re.search(r"NANOG\s+\d+", cells[0]):
                 continue
 
-            if NANOG_NUM in range(61, 70):
+            if NANOG_NUM in range(61, 69):
                 # "Last, First" in a single column, possibly with a
                 # leading empty column (NANOG 66-67)
                 name_col = 0
@@ -224,8 +253,25 @@ def parse_attendees_pdf(attendee_pdf):
                 if cells[0] == "" and len(cells) >= 3:
                     name_col = 1
                     org_col = 2
-                (fname, lname) = fix_pdf_names(cells[name_col])
+                names = fix_pdf_names(cells[name_col])
+                if names is None:
+                    # a long name can wrap onto a second line, e.g.
+                    # "Cuellar Gallegos, Hector" / "Ignacio  ITESM". the
+                    # first line has no company, so fold this one into it.
+                    prev = attendees[-1] if attendees else None
+                    if cells[name_col] and prev and prev[3] == "":
+                        prev[2] = f"{prev[2]} {cells[name_col]}".strip()
+                        prev[3] = cells[org_col] if len(cells) > org_col else ""
+                        continue
+                    print(f"malformed attendee: {NANOG_NUM} {cells}", file=sys.stderr)
+                    continue
+                (fname, lname) = names
                 org = cells[org_col] if len(cells) > org_col else ""
+            elif NANOG_NUM == 69:
+                # First, Last, Company, ASN
+                fname = cells[0]
+                lname = cells[1]
+                org = cells[2] if len(cells) > 2 else ""
             elif NANOG_NUM == 78:
                 # Last, First, ASN, Company (company is col 3)
                 lname = cells[0]
